@@ -5,15 +5,32 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\User;
+use Illuminate\Support\Facades\Redis;
+
 
 class UserController extends Controller
 {
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $req)
     {
-      return User::paginate();
+        $page = $req->input('page', 1);
+        $limit = $req->input('limit', 10);
+        $offset = ($page - 1) * $limit;
+
+        $users = Redis::get('users:page:' . $page);
+
+        Redis::del('users:page:' . $page);
+
+        if (!$users) {
+            $users = User::skip($offset)->take($limit)->get();
+            Redis::set('users:page:' . $page, $users->toJson()); // Convert to JSON before storing
+        } else {
+            $users = json_decode($users, true); // Decode JSON into an associative array
+        }
+
+        return response()->json($users); // Return a proper JSON response
     }
 
     /**
