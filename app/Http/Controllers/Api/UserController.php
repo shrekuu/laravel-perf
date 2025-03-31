@@ -15,22 +15,26 @@ class UserController extends Controller
      */
     public function index(Request $req)
     {
+        // --- BEGIN: without redis ---
+        // return User::paginate();
+        // --- END: without redis ---
+
+        // --- BEGIN: with redis ---
         $page = $req->input('page', 1);
         $limit = $req->input('limit', 10);
         $offset = ($page - 1) * $limit;
 
-        $users = Redis::get('users:page:' . $page);
+        $jsonUsers = Redis::get('users:page:' . $page);
 
-        Redis::del('users:page:' . $page);
-
-        if (!$users) {
+        if (!$jsonUsers) {
             $users = User::skip($offset)->take($limit)->get();
-            Redis::set('users:page:' . $page, $users->toJson()); // Convert to JSON before storing
+            Redis::set('users:page:' . $page, $users->toJson());
         } else {
-            $users = json_decode($users, true); // Decode JSON into an associative array
+            $users = json_decode($jsonUsers);
         }
 
-        return response()->json($users); // Return a proper JSON response
+        return $users;
+        // --- END: with redis ---
     }
 
     /**
